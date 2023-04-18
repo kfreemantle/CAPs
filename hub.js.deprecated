@@ -1,11 +1,12 @@
 'use strict';
 
-// Import the global event pool
+// hub.js is the listener that handles all the event logic
+// so first thing it does is import the global event pool
 const events = require('./eventPool.js');
 
-// Import the vendor and driver handlers
-const vendorHandler = require('./vendor/handler.js');
-const driverHandler = require('./driver/handler.js');
+// then it imports the vendor and driver handlers
+const vendorHandler = require('./clients/vendor/handler.js');
+const driverHandler = require('./clients/driver/handler.js');
 
 // Initialize the vendor and driver event handlers
 vendorHandler(events);
@@ -31,7 +32,7 @@ events.emit('pickup', {
   payload: {
     store: '1-206-flowers',
     orderId: 'e3669048-7313-427b-b6cc-74010ca1f8f0',
-    customer: 'Jamal Braun',
-    address: 'Schmittfort, LA'
+    customer: 'Knacob Jaack',
+    address: '3224 Pike St, Seattle, WA 98101'
   }
 });
