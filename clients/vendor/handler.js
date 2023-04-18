@@ -1,27 +1,20 @@
 "use strict";
 
-const Chance = require('chance');
-const chance = new Chance();
+function handlePickup(payload) {
+  console.log(`DRIVER: Picked up ${payload.orderId}`);
+  this.emit("in-transit", payload);
 
-function handlePickup() {
-  const payload = {
-    vendorId: '1-206-flowers',
-    orderId: chance.guid(),
-    customer: chance.name(),
-    address: chance.address(),
-  };
-
-  console.log('New order:', payload);
-  this.emit('pickup', payload);
+  setTimeout(() => {
+    this.emit("delivered", payload);
+  }, 3000);
 }
 
-// New event handlers for 'in-transit' and 'delivered' events
 function handleInTransit(payload) {
-  console.log(`VENDOR: Order ${payload.orderId} is in transit`);
+  console.log(`DRIVER: In transit ${payload.orderId}`);
 }
 
 function handleDelivered(payload) {
-  console.log(`VENDOR: Order ${payload.orderId} has been delivered`);
+  console.log(`DRIVER: Delivered ${payload.orderId}`);
 }
 
 module.exports = { handlePickup, handleInTransit, handleDelivered };
