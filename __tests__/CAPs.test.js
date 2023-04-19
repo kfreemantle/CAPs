@@ -2,16 +2,22 @@
 
 const io = require("socket.io-client");
 const SERVER_URL = "http://localhost:3000";
+const ioClient = require("socket.io-client");
+const { Server } = require("socket.io");
+const http = require("http");
+
+const PORT = 3000;
 
 let server;
 let flowerVendorSocket;
 let widgetVendorSocket;
 let driverSocket; // Add this line
 
-beforeAll(async () => {
+beforeAll(async (done) => {
   // Set up the server
-  server = createServer();
+  server = new Server(http.createServer());
   server.listen(PORT, () => console.log(`Server listening on PORT ${PORT}`));
+
 
   // Set up the sockets for clients
   driverSocket = await new Promise((resolve) => {
@@ -43,7 +49,10 @@ beforeAll(async () => {
       resolve(socket);
     });
   });
+
+  done();
 });
+
 
 
 afterAll((done) => {
