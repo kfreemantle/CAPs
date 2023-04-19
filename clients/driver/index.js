@@ -1,15 +1,29 @@
 "use strict";
 
-// // Import the driver handler module (it will automatically start listening for events)
-// require('./handler.js');
+const io = require('socket.io-client');
+const handler = require('./handler');
 
-const io = require("socket.io-client");
-const handler = require("./handler");
+const SOCKET_SERVER_URL = process.env.SOCKET_SERVER_URL || 'http://localhost:3000';
 
-const host = process.env.HOST || "http://localhost:3000/caps";
-const socket = io.connect(host);
+const socket = io(SOCKET_SERVER_URL);
 
-// Register the event listeners for the driver
-socket.on("pickup", handler.handlePickup);
-socket.on("in-transit", handler.handleInTransit);
-socket.on("delivered", handler.handleDelivered);
+socket.on('connect', () => {
+  console.log('Connected to CAPS server as a driver');
+
+  // Subscribe to the 'pickup' event
+  socket.emit('subscribe', { clientId: 'driver', eventName: 'pickup' });
+
+  // Request all undelivered 'pickup' messages
+  socket.emit('getAll', { clientId: 'driver', eventName: 'pickup' });
+});
+
+// Event handlers
+socket.on('pickup', (payload) => {
+  handler.pickup(socket, payload);
+});
+
+socket.on('disconnect', () => {
+  console.log('Disconnected from CAPS server');
+});
+
+module.exports = socket;
