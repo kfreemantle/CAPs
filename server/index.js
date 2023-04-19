@@ -1,38 +1,54 @@
 'use strict';
 
-const io = require('socket.io')(3000, {
-  cors: {
-    origin: '*',
-  },
-});
-console.log('Socket.io server running on port 3000');
+const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
 
-const capsNamespace = io.of('/caps');
+const app = express();
 
-capsNamespace.on('connection', (socket) => {
-  console.log('Connected:', socket.id);
+// Create an HTTP server with the express app as the request handler
+const server = http.createServer(app);
 
-  // Allow clients to join a room
-  socket.on('join', (room) => {
-    console.log('Joining room:', room);
-    socket.join(room);
-  });
+// Create a new socket.io instance attached to the HTTP server
+const io = socketIo(server);
 
-  // Listen for 'pickup' event and broadcast it
+// Setup the socket.io connection event handler
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+
+  // Set up event listeners for the socket
   socket.on('pickup', (payload) => {
-    console.log('pickup:', payload);
-    capsNamespace.emit('pickup', payload);
+    console.log('Event: pickup', payload);
+    // Emit 'pickup' event to all connected clients
+    io.emit('pickup', payload);
   });
 
-  // Listen for 'in-transit' event and emit it to the specific vendor
   socket.on('in-transit', (payload) => {
-    console.log('in-transit:', payload);
-    socket.to(payload.vendorId).emit('in-transit', payload);
+    console.log('Event: in-transit', payload);
+    // Emit 'in-transit' event to all connected clients
+    io.emit('in-transit', payload);
   });
 
-  // Listen for 'delivered' event and emit it to the specific vendor
   socket.on('delivered', (payload) => {
-    console.log('delivered:', payload);
-    socket.to(payload.vendorId).emit('delivered', payload);
+    console.log('Event: delivered', payload);
+    // Emit 'delivered' event to all connected clients
+    io.emit('delivered', payload);
+  });
+
+  // Handle the socket disconnect event
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
   });
 });
+
+// Start the server only if this script is being run directly,
+// not when it is being imported as a module (for testing)
+if (require.main === module) {
+  const port = process.env.PORT || 3000;
+  server.listen(port, () => {
+    console.log(`Socket.io server running on port ${port}`);
+  });
+}
+
+// Export the server instance to be used in tests
+module.exports = server;

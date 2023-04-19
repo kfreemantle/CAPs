@@ -1,7 +1,7 @@
 'use strict';
 
 const io = require('socket.io-client');
-const { server } = require('../server/index');
+const server = require('../server/index');
 const port = 3000;
 
 const host = `http://localhost:${port}`;
@@ -22,7 +22,7 @@ describe('CAPs Event Handlers', () => {
   });
 
   beforeEach((done) => {
-    clientSocket = io.connect(host);
+    clientSocket = io.connect(host, { forceNew: true });
     clientSocket.on('connect', () => done());
   });
 
