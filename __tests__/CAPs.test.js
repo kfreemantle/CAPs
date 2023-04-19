@@ -1,15 +1,13 @@
 'use strict';
 
 const io = require('socket.io-client');
-const { server } = require('../server');
-const port = process.env.PORT || 3000;
+const server = require('../server/index');
+const port = 3000;
 
 const host = `http://localhost:${port}`;
-const capsNamespace = `${host}/caps`;
 
-const options = {
-  transports: ['websocket'],
-  forceNew: true,
+const simulatePickup = (clientSocket, payload) => {
+  clientSocket.emit('pickup', payload);
 };
 
 describe('CAPs Event Handlers', () => {
@@ -24,10 +22,8 @@ describe('CAPs Event Handlers', () => {
   });
 
   beforeEach((done) => {
-    clientSocket = io.connect(capsNamespace, options);
-    clientSocket.on('connect', () => {
-      done();
-    });
+    clientSocket = io.connect(host, { forceNew: true });
+    clientSocket.on('connect', () => done());
   });
 
   afterEach((done) => {
@@ -39,24 +35,24 @@ describe('CAPs Event Handlers', () => {
 
   // Test for 'pickup' event emission
   test('simulatePickup should emit pickup event', (done) => {
-    // Listen for the 'pickup' event on the client socket
-    clientSocket.on('pickup', (payload) => {
-      // When the event is emitted, check if the payload is defined
-      expect(payload).toBeDefined();
-      done();
-    });
-
-    // Emit a 'pickup' event from the client socket to simulate a new order
-    clientSocket.emit('pickup', {
+    const pickupPayload = {
       vendorId: 'test-vendor',
       orderId: 'test-order',
       customer: 'test-customer',
       address: 'test-address',
+    };
+
+    clientSocket.on('pickup', (payload) => {
+      expect(payload).toBeDefined();
+      expect(payload).toEqual(pickupPayload);
+      done();
     });
+
+    simulatePickup(clientSocket, pickupPayload);
   });
 
   // Test for 'in-transit' event handler
-  test('vendorHandler should handle in-transit event', (done) => {
+  test('CAPs should handle in-transit event', (done) => {
     // Listen for the 'in-transit' event on the client socket
     clientSocket.on('in-transit', (payload) => {
       // When the event is emitted, check if the payload is defined
@@ -64,17 +60,12 @@ describe('CAPs Event Handlers', () => {
       done();
     });
 
-    // Emit a 'pickup' event from the client socket to simulate a new order
-    clientSocket.emit('pickup', {
-      vendorId: 'test-vendor',
-      orderId: 'test-order',
-      customer: 'test-customer',
-      address: 'test-address',
-    });
+    // Emit the 'in-transit' event to trigger the event handler
+    clientSocket.emit('in-transit', {});
   });
 
   // Test for 'delivered' event handler
-  test('vendorHandler should handle delivered event', (done) => {
+  test('CAPs should handle delivered event', (done) => {
     // Listen for the 'delivered' event on the client socket
     clientSocket.on('delivered', (payload) => {
       // When the event is emitted, check if the payload is defined
@@ -82,12 +73,7 @@ describe('CAPs Event Handlers', () => {
       done();
     });
 
-    // Emit a 'pickup' event from the client socket to simulate a new order
-    clientSocket.emit('pickup', {
-      vendorId: 'test-vendor',
-      orderId: 'test-order',
-      customer: 'test-customer',
-      address: 'test-address',
-    });
+    // Emit the 'delivered' event to trigger the event handler
+    clientSocket.emit('delivered', {});
   });
 });
