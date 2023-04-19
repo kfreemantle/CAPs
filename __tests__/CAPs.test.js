@@ -1,79 +1,165 @@
 'use strict';
 
-const io = require('socket.io-client');
-const server = require('../server/index');
-const port = 3000;
+const io = require("socket.io-client");
+const SERVER_URL = "http://localhost:3000";
+const ioClient = require("socket.io-client");
+const { Server } = require("socket.io");
+const http = require("http");
 
-const host = `http://localhost:${port}`;
+const PORT = 3000;
 
-const simulatePickup = (clientSocket, payload) => {
-  clientSocket.emit('pickup', payload);
-};
+let server;
+let flowerVendorSocket;
+let widgetVendorSocket;
+let driverSocket; // Add this line
 
-describe('CAPs Event Handlers', () => {
-  let clientSocket;
+beforeAll(async (done) => {
+  // Set up the server
+  server = new Server(http.createServer());
+  server.listen(PORT, () => console.log(`Server listening on PORT ${PORT}`));
 
-  beforeAll((done) => {
-    server.listen(port, () => done());
-  });
 
-  afterAll((done) => {
-    server.close(() => done());
-  });
-
-  beforeEach((done) => {
-    clientSocket = io.connect(host, { forceNew: true });
-    clientSocket.on('connect', () => done());
-  });
-
-  afterEach((done) => {
-    if (clientSocket.connected) {
-      clientSocket.disconnect();
-    }
-    done();
-  });
-
-  // Test for 'pickup' event emission
-  test('simulatePickup should emit pickup event', (done) => {
-    const pickupPayload = {
-      vendorId: 'test-vendor',
-      orderId: 'test-order',
-      customer: 'test-customer',
-      address: 'test-address',
-    };
-
-    clientSocket.on('pickup', (payload) => {
-      expect(payload).toBeDefined();
-      expect(payload).toEqual(pickupPayload);
-      done();
+  // Set up the sockets for clients
+  driverSocket = await new Promise((resolve) => {
+    const socket = ioClient(`http://localhost:${PORT}`, {
+      auth: { role: "driver" },
     });
 
-    simulatePickup(clientSocket, pickupPayload);
+    socket.on("connect", () => {
+      resolve(socket);
+    });
   });
 
-  // Test for 'in-transit' event handler
-  test('CAPs should handle in-transit event', (done) => {
-    // Listen for the 'in-transit' event on the client socket
-    clientSocket.on('in-transit', (payload) => {
-      // When the event is emitted, check if the payload is defined
-      expect(payload).toBeDefined();
-      done();
+  flowerVendorSocket = await new Promise((resolve) => {
+    const socket = ioClient(`http://localhost:${PORT}`, {
+      auth: { role: "vendor", storeName: "Flowers" },
     });
 
-    // Emit the 'in-transit' event to trigger the event handler
-    clientSocket.emit('in-transit', {});
+    socket.on("connect", () => {
+      resolve(socket);
+    });
   });
 
-  // Test for 'delivered' event handler
-  test('CAPs should handle delivered event', (done) => {
-    // Listen for the 'delivered' event on the client socket
-    clientSocket.on('delivered', (payload) => {
-      // When the event is emitted, check if the payload is defined
-      expect(payload).toBeDefined();
-      done();
+  widgetVendorSocket = await new Promise((resolve) => {
+    const socket = ioClient(`http://localhost:${PORT}`, {
+      auth: { role: "vendor", storeName: "Widgets" },
     });
 
-    // Emit the 'delivered' event to trigger the event handler
-    clientSocket.emit('delivered', {});
+    socket.on("connect", () => {
+      resolve(socket);
+    });
+  });
+
+  done();
+});
+
+
+
+afterAll((done) => {
+  // Close the server and client sockets
+  driverSocket.close();
+  flowerVendorSocket.close();
+  widgetVendorSocket.close();
+  server.close(done);
+});
+
+describe("driverHandler", () => {
+  test("pickup event should log and emit the in-transit event", () => {
+    const logSpy = jest.spyOn(console, "log");
+    const emitSpy = jest.fn();
+
+    const socket = { emit: emitSpy };
+    const payload = { orderId: "1234", store: "test-store" };
+
+    driverHandler.pickup(socket, payload);
+
+    expect(logSpy).toHaveBeenCalledWith(`DRIVER: Picked up order ${payload.orderId}`);
+    expect(emitSpy).toHaveBeenCalledWith("in-transit", payload);
+  });
+
+  test("delivered event should log and emit the delivered event", () => {
+    const logSpy = jest.spyOn(console, "log");
+    const emitSpy = jest.fn();
+
+    const socket = { emit: emitSpy };
+    const payload = { orderId: "1234", store: "test-store" };
+
+    driverHandler.delivered(socket, payload);
+
+    expect(logSpy).toHaveBeenCalledWith(`DRIVER: Delivered order ${payload.orderId}`);
+    expect(emitSpy).toHaveBeenCalledWith("delivered", payload);
+  });
+});
+
+describe("flowerVendorHandler", () => {
+  test("delivered event should log and emit the received event", () => {
+    const logSpy = jest.spyOn(console, "log");
+    const emitSpy = jest.fn();
+
+    const socket = { emit: emitSpy };
+    const payload = { orderId: "1234", store: "1-800-flowers" };
+
+    flowerVendorHandler.delivered(socket, payload);
+
+    expect(logSpy).toHaveBeenCalledWith(`FLOWER VENDOR: Order ${payload.orderId} delivered`);
+    expect(emitSpy).toHaveBeenCalledWith("received", {
+      clientId: payload.store,
+      eventName: "delivered",
+      messageId: payload.orderId,
+    });
+  });
+});
+
+describe("widgetVendorHandler", () => {
+  test("delivered event should log and emit the received event", () => {
+    const logSpy = jest.spyOn(console, "log");
+    const emitSpy = jest.fn();
+
+    const socket = { emit: emitSpy };
+    const payload = { orderId: "1234", store: "widget-vendor" };
+
+    widgetVendorHandler.delivered(socket, payload);
+
+    expect(logSpy).toHaveBeenCalledWith(`WIDGET VENDOR: Order ${payload.orderId} delivered`);
+    expect(emitSpy).toHaveBeenCalledWith("received", {
+      clientId: payload.store,
+      eventName: "delivered",
+      messageId: payload.orderId,
+    });
+  });
+});
+
+describe("Server queue functionality", () => {
+  test("Server should add payload to the appropriate queue", () => {
+    const payload = { orderId: "testOrderId", store: "1-800-flowers" };
+    serverSocket.emit("pickup", payload);
+    expect(Queue.pickupQueue).toContain(payload);
+  });
+
+  test("Server should remove payload from the queue after it's received by the client", (done) => {
+    const payload = { orderId: "testOrderId", store: "1-800-flowers" };
+    flowerVendorSocket.emit("received", { clientId: payload.store, eventName: "delivered", messageId: payload.orderId });
+    setTimeout(() => {
+      expect(Queue.deliveredQueue[payload.store]).not.toContain(payload.orderId);
+      done();
+    }, 1000);
+  });
+
+  test("Clients should subscribe to appropriate queues", (done) => {
+    clientSocket.emit("subscribe", { clientId: "1-800-flowers", eventName: "delivered" });
+    clientSocket.emit("subscribe", { clientId: "widget-vendor", eventName: "delivered" });
+    setTimeout(() => {
+      expect(Queue.subscribers.delivered["1-800-flowers"]).toBeDefined();
+      expect(Queue.subscribers.delivered["widget-vendor"]).toBeDefined();
+      done();
+    }, 1000);
+  });
+
+  test("Clients should request undelivered messages from the server", (done) => {
+    flowerVendorSocket.emit("getAll", { clientId: "1-800-flowers", eventName: "delivered" });
+    flowerVendorSocket.on("delivered", (payload) => {
+      expect(payload).toEqual({ orderId: "testDriverPickup", store: "1-800-flowers" });
+      done();
+    });
   });
 });

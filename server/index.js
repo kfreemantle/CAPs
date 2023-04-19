@@ -3,46 +3,74 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const Queue = require('./lib/queue');
 
 const app = express();
-
-// Create an HTTP server with the express app as the request handler
 const server = http.createServer(app);
-
-// Create a new socket.io instance attached to the HTTP server
 const io = socketIo(server);
 
-// Setup the socket.io connection event handler
+// Create new Queue instances for drivers and vendors
+const driverQueue = new Queue();
+const vendorQueue = new Queue();
+
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
-  // Set up event listeners for the socket
+  // Handle event subscriptions
+  socket.on('subscribe', ({ clientId, eventName }) => {
+    console.log(`Client ${clientId} subscribed to event ${eventName}`);
+    socket.join(eventName);
+  });
+
+  // Handle event unsubscriptions
+  socket.on('unsubscribe', ({ clientId, eventName }) => {
+    console.log(`Client ${clientId} unsubscribed from event ${eventName}`);
+    socket.leave(eventName);
+  });
+
+  // Handle the 'getAll' event for clients to request all undelivered messages
+  socket.on('getAll', ({ clientId, eventName }) => {
+    console.log(`Client ${clientId} requests all messages for event ${eventName}`);
+    const messages = eventName === 'pickup' ? driverQueue.getAll(clientId) : vendorQueue.getAll(clientId);
+
+    messages.forEach((message) => {
+      socket.emit(eventName, message);
+    });
+  });
+
+  // Handle the 'received' event to remove a message from the queue
+  socket.on('received', ({ clientId, eventName, messageId }) => {
+    console.log(`Client ${clientId} received message ${messageId} for event ${eventName}`);
+    if (eventName === 'pickup') {
+      driverQueue.remove(clientId, messageId);
+    } else if (eventName === 'delivered') {
+      vendorQueue.remove(clientId, messageId);
+    }
+  });
+
+  // Event listeners for 'pickup', 'in-transit', and 'delivered'
   socket.on('pickup', (payload) => {
     console.log('Event: pickup', payload);
-    // Emit 'pickup' event to all connected clients
-    io.emit('pickup', payload);
+    driverQueue.add(payload.vendorId, payload); // Add the message to the driver queue
+    io.to('pickup').emit('pickup', payload);
   });
 
   socket.on('in-transit', (payload) => {
     console.log('Event: in-transit', payload);
-    // Emit 'in-transit' event to all connected clients
-    io.emit('in-transit', payload);
+    io.to('in-transit').emit('in-transit', payload);
   });
 
   socket.on('delivered', (payload) => {
     console.log('Event: delivered', payload);
-    // Emit 'delivered' event to all connected clients
-    io.emit('delivered', payload);
+    vendorQueue.add(payload.vendorId, payload); // Add the message to the vendor queue
+    io.to('delivered').emit('delivered', payload);
   });
 
-  // Handle the socket disconnect event
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });
 });
 
-// Start the server only if this script is being run directly,
-// not when it is being imported as a module (for testing)
 if (require.main === module) {
   const port = process.env.PORT || 3000;
   server.listen(port, () => {
@@ -50,5 +78,4 @@ if (require.main === module) {
   });
 }
 
-// Export the server instance to be used in tests
 module.exports = server;

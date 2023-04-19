@@ -1,24 +1,18 @@
 "use strict";
 
-function handlePickup(payload) {
-  console.log(`DRIVER: Picked up ${payload.orderId}`);
-  
-  // Simulate some time passing before emitting the 'in-transit' event
+function pickup(socket, payload) {
+  console.log(`DRIVER: Picked up order ${payload.orderId}`);
   setTimeout(() => {
-    this.emit('in-transit', payload);
+    socket.emit('in-transit', payload);
+    console.log(`DRIVER: Order ${payload.orderId} is in transit`);
   }, 1000);
 
   setTimeout(() => {
-    this.emit('delivered', payload);
+    socket.emit('delivered', payload);
+    console.log(`DRIVER: Order ${payload.orderId} has been delivered`);
   }, 3000);
 }
 
-function handleInTransit(payload) {
-  console.log(`DRIVER: In transit ${payload.orderId}`);
-}
-
-function handleDelivered(payload) {
-  console.log(`DRIVER: Delivered ${payload.orderId}`);
-}
-
-module.exports = { handlePickup, handleInTransit, handleDelivered };
+module.exports = {
+  pickup,
+};
