@@ -1,53 +1,50 @@
 'use strict';
 
-const { createServer } = require("http");
-const { Server } = require("socket.io");
-const Client = require("socket.io-client");
-const Queue = require("../server/lib/queue");
-const driverHandler = require("../clients/driver/handler");
-const flowerVendorHandler = require("../clients/flower-vendor/handler");
-const widgetVendorHandler = require("../clients/widget-vendor/handler");
+const io = require("socket.io-client");
+const SERVER_URL = "http://localhost:3000";
 
-beforeAll((done) => {
-  // Create the server instance and start the server
-  server = createServer(caps.app);
-  caps.start(server);
+let server;
+let flowerVendorSocket;
+let widgetVendorSocket;
+let driverSocket; // Add this line
 
-  // Create the serverSocket instance
-  serverSocket = caps.io();
+beforeAll(async () => {
+  // Set up the server
+  server = createServer();
+  server.listen(PORT, () => console.log(`Server listening on PORT ${PORT}`));
 
-  // Connect the driver client to the server
-  driverSocket = caps.io("http://localhost:3000");
-  driverSocket.on("connect", () => {
-    // Set the driver's event listeners
-    driverSocket.on("pickup", (payload) => {
-      driverHandler.pickup(driverSocket, payload);
+  // Set up the sockets for clients
+  driverSocket = await new Promise((resolve) => {
+    const socket = ioClient(`http://localhost:${PORT}`, {
+      auth: { role: "driver" },
     });
-    driverSocket.on("delivered", (payload) => {
-      driverHandler.delivered(driverSocket, payload);
+
+    socket.on("connect", () => {
+      resolve(socket);
     });
   });
 
-  // Connect the flower vendor client to the server
-  flowerVendorSocket = caps.io("http://localhost:3000");
-  flowerVendorSocket.on("connect", () => {
-    // Set the flower vendor's event listeners
-    flowerVendorSocket.on("delivered", (payload) => {
-      flowerVendorHandler.delivered(flowerVendorSocket, payload);
+  flowerVendorSocket = await new Promise((resolve) => {
+    const socket = ioClient(`http://localhost:${PORT}`, {
+      auth: { role: "vendor", storeName: "Flowers" },
+    });
+
+    socket.on("connect", () => {
+      resolve(socket);
     });
   });
 
-  // Connect the widget vendor client to the server
-  widgetVendorSocket = caps.io("http://localhost:3000");
-  widgetVendorSocket.on("connect", () => {
-    // Set the widget vendor's event listeners
-    widgetVendorSocket.on("delivered", (payload) => {
-      widgetVendorHandler.delivered(widgetVendorSocket, payload);
+  widgetVendorSocket = await new Promise((resolve) => {
+    const socket = ioClient(`http://localhost:${PORT}`, {
+      auth: { role: "vendor", storeName: "Widgets" },
+    });
+
+    socket.on("connect", () => {
+      resolve(socket);
     });
   });
-
-  done();
 });
+
 
 afterAll((done) => {
   // Close the server and client sockets
