@@ -6,7 +6,7 @@ A simulated parcel delivery system using Node.js with an event-driven architectu
 
 ## Author
 
-**Kyle Freemantle
+**Kyle Freemantle**
 
 ## Version
 
@@ -30,6 +30,7 @@ The CAPS system is built using Node.js and follows an event-driven architecture.
 
 ## Change Log
 
+04-28-2023 - Refactored to use socket.io
 04-17-2023 - Initial implementation
 
 ## Credits and Collaborations
@@ -38,6 +39,13 @@ The CAPS system is built using Node.js and follows an event-driven architecture.
 - ChatGPT v4 for assistance with verbose comments to help me understand the syntax and request flow.
 - Steven Gantz, fellow Code Fellows student for reference https://github.com/stevengant
 
-## UML
+## UMLs
+
+### Lab 11
 
 ![UML Diagram](./img/lab11uml.png)
+
+### Lab 12
+
+![UML Diagram](/./img/lab12uml.png)
+
